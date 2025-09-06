@@ -2001,11 +2001,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5980256b8b131224ab5a9528d9474912, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  serverPort: 5555
   serverAddress: 127.0.0.1
-  _client: {fileID: 1144782921}
+  serverPort: 5555
+  client: {fileID: 1144782921}
   messageInput: {fileID: 1155689738}
   chatUIManager: {fileID: 1907149590}
+  maxMessageLength: 512
 --- !u!1 &1411727617
 GameObject:
   m_ObjectHideFlags: 0

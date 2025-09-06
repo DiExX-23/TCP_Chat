@@ -947,7 +947,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: -0.0002911524, y: 0}
+  m_AnchoredPosition: {x: -0.0000023805621, y: 0}
   m_SizeDelta: {x: 100, y: 0}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &841131885
@@ -1609,10 +1609,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c76abd1828082b3bf90a02d6ed8074c4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _server: {fileID: 1144782921}
+  server: {fileID: 1144782921}
   messageInput: {fileID: 1155689738}
   chatUIManager: {fileID: 1870792999}
   listenPort: 5555
+  maxMessageLength: 512
 --- !u!1 &1246144399
 GameObject:
   m_ObjectHideFlags: 0
@@ -1772,7 +1773,7 @@ MonoBehaviour:
   m_HandleRect: {fileID: 265783683}
   m_Direction: 0
   m_Value: 1
-  m_Size: 0.99976236
+  m_Size: 0.99988717
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
