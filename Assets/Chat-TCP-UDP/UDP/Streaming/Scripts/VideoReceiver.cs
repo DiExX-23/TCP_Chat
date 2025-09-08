@@ -1,4 +1,3 @@
-// VideoReceiver.cs
 using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
@@ -6,8 +5,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Receives fragmented JPEG frames via UdpTransport, reassembles and updates RawImage on main thread.
-/// Uses ConcurrentQueue to hand over assembled frames to Unity thread.
+/// Receives fragmented JPEG frames via UdpTransport, reassembles them and updates a RawImage.
 /// </summary>
 [RequireComponent(typeof(UdpTransport))]
 public class VideoReceiver : MonoBehaviour
@@ -15,24 +13,35 @@ public class VideoReceiver : MonoBehaviour
     public UdpTransport transport;
     public RawImage targetImage;
 
-    private readonly object lockObj = new object();
     private class FrameBuffer { public int frameId; public ushort total; public Dictionary<ushort, byte[]> chunks = new Dictionary<ushort, byte[]>(); public DateTime firstReceived = DateTime.UtcNow; }
-    private Dictionary<int, FrameBuffer> frames = new Dictionary<int, FrameBuffer>();
-
-    private ConcurrentQueue<byte[]> readyFrames = new ConcurrentQueue<byte[]>(); // complete JPGs to process on main thread
+    private readonly object lockObj = new object();
+    private readonly Dictionary<int, FrameBuffer> frames = new Dictionary<int, FrameBuffer>();
+    private readonly ConcurrentQueue<byte[]> readyFrames = new ConcurrentQueue<byte[]>();
+    private bool subscribed = false;
 
     private void Awake() { transport = transport ?? GetComponent<UdpTransport>(); }
+    private void OnEnable() { TrySubscribe(); }
+    private void OnDisable()
+    {
+        if (subscribed && transport != null) transport.OnPacketReceived -= OnPacket;
+        subscribed = false;
+        ClearImage(); // clear frozen frame
+    }
 
-    private void OnEnable() { if (transport != null) transport.OnPacketReceived += OnPacket; }
-    private void OnDisable() { if (transport != null) transport.OnPacketReceived -= OnPacket; }
+    private void TrySubscribe()
+    {
+        if (!subscribed && transport != null)
+        {
+            transport.OnPacketReceived += OnPacket;
+            subscribed = true;
+        }
+    }
 
-    // Called on transport receive thread: reassemble fragments and enqueue full images
     private void OnPacket(byte[] data, System.Net.IPEndPoint src)
     {
         if (data == null || data.Length <= Packetizer.HeaderSize) return;
-
         Packetizer.ParseHeader(data, out int frameId, out ushort packetIndex, out ushort packetCount, out byte streamType);
-        if (streamType != 1) return; // only video
+        if (streamType != 1) return;
 
         int payloadOffset = Packetizer.HeaderSize;
         int payloadLen = data.Length - payloadOffset;
@@ -46,6 +55,7 @@ public class VideoReceiver : MonoBehaviour
                 fb = new FrameBuffer { frameId = frameId, total = packetCount, firstReceived = DateTime.UtcNow };
                 frames[frameId] = fb;
             }
+
             if (!fb.chunks.ContainsKey(packetIndex)) fb.chunks[packetIndex] = payload;
 
             if (fb.chunks.Count == fb.total)
@@ -64,7 +74,6 @@ public class VideoReceiver : MonoBehaviour
                 frames.Remove(frameId);
             }
 
-            // cleanup stale
             var timeout = DateTime.UtcNow.AddSeconds(-2);
             var stale = new List<int>();
             foreach (var kv in frames) if (kv.Value.firstReceived < timeout) stale.Add(kv.Key);
@@ -72,9 +81,9 @@ public class VideoReceiver : MonoBehaviour
         }
     }
 
-    // On main thread, process ready frames and update UI
     private void Update()
     {
+        TrySubscribe();
         while (readyFrames.TryDequeue(out var jpg))
         {
             try
@@ -88,16 +97,20 @@ public class VideoReceiver : MonoBehaviour
                         targetImage.color = Color.white;
                         targetImage.enabled = true;
                     }
+                    else Destroy(tex);
                 }
-                else
-                {
-                    UnityEngine.Object.Destroy(tex);
-                }
+                else Destroy(tex);
             }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[VideoReceiver] Failed to load image: {ex.Message}");
-            }
+            catch (Exception ex) { Debug.LogWarning($"[VideoReceiver] Frame error: {ex.Message}"); }
+        }
+    }
+
+    public void ClearImage()
+    {
+        if (targetImage != null)
+        {
+            targetImage.texture = null;
+            targetImage.color = Color.black;
         }
     }
 }

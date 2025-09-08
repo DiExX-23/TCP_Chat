@@ -1,12 +1,7 @@
-// AudioSender.cs
 using System;
 using System.Collections;
 using UnityEngine;
 
-/// <summary>
-/// Capture microphone audio, convert to PCM16 and send small frames periodically.
-/// Waits until microphone is ready and reuses buffers to reduce allocations.
-/// </summary>
 [RequireComponent(typeof(UdpTransport))]
 public class AudioSender : MonoBehaviour
 {
@@ -22,7 +17,6 @@ public class AudioSender : MonoBehaviour
 
     private void Awake() { transport = transport ?? GetComponent<UdpTransport>(); }
 
-    // Start capturing and sending; wait until microphone actually provides samples
     public void StartSending()
     {
         if (sending) return;
@@ -34,12 +28,11 @@ public class AudioSender : MonoBehaviour
         StartCoroutine(StartMicrophoneAndSend());
     }
 
-    // Coroutine to ensure microphone readiness
     private IEnumerator StartMicrophoneAndSend()
     {
         if (Microphone.IsRecording(null)) Microphone.End(null);
         microphoneClip = Microphone.Start(null, true, 1, sampleRate);
-        float timeout = 1.0f;
+        float timeout = 1f;
         float start = Time.realtimeSinceStartup;
         int pos = 0;
         while (Time.realtimeSinceStartup - start < timeout)
@@ -49,7 +42,7 @@ public class AudioSender : MonoBehaviour
         }
         if (!Microphone.IsRecording(null) || pos <= 0)
         {
-            Debug.LogWarning($"[AudioSender] Microphone failed to start (pos={pos}).");
+            Debug.LogWarning("[AudioSender] Microphone failed to start.");
             try { Microphone.End(null); } catch { }
             microphoneClip = null;
             yield break;
@@ -60,7 +53,6 @@ public class AudioSender : MonoBehaviour
         StartCoroutine(SendLoop());
     }
 
-    // Stop and cleanup
     public void StopSending()
     {
         sending = false;
@@ -69,7 +61,6 @@ public class AudioSender : MonoBehaviour
         lastPosition = 0;
     }
 
-    // Main loop: read audio frames, convert to PCM16 and send
     private IEnumerator SendLoop()
     {
         if (microphoneClip == null) yield break;
@@ -89,10 +80,10 @@ public class AudioSender : MonoBehaviour
 
             while (available >= samplesPerFrame && sending)
             {
-                try { microphoneClip.GetData(buffer, lastPosition); } catch (Exception ex) { Debug.LogWarning($"[AudioSender] GetData failed: {ex.Message}"); available = 0; break; }
+                try { microphoneClip.GetData(buffer, lastPosition); }
+                catch { available = 0; break; }
 
-                int outBytes = samplesPerFrame * channels * 2;
-                byte[] pcm = new byte[outBytes];
+                byte[] pcm = new byte[samplesPerFrame * channels * 2];
                 int outIndex = 0;
                 for (int i = 0; i < samplesPerFrame * channels; i++)
                 {

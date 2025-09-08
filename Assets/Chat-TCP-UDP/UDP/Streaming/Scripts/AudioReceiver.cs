@@ -1,12 +1,8 @@
-// AudioReceiver.cs
 using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using UnityEngine;
 
-/// <summary>
-/// Receives fragmented PCM frames, reassembles them and enqueues byte[] for AudioPlayer.
-/// </summary>
 [RequireComponent(typeof(UdpTransport))]
 public class AudioReceiver : MonoBehaviour
 {
@@ -21,13 +17,11 @@ public class AudioReceiver : MonoBehaviour
     private void OnEnable() { if (transport != null) transport.OnPacketReceived += OnPacket; }
     private void OnDisable() { if (transport != null) transport.OnPacketReceived -= OnPacket; }
 
-    // Packet handler (can be called on receive thread)
     private void OnPacket(byte[] data, System.Net.IPEndPoint src)
     {
         if (data == null || data.Length <= Packetizer.HeaderSize) return;
-
         Packetizer.ParseHeader(data, out int frameId, out ushort packetIndex, out ushort packetCount, out byte streamType);
-        if (streamType != 2) return; // audio only
+        if (streamType != 2) return;
 
         int payloadOffset = Packetizer.HeaderSize;
         int payloadLen = data.Length - payloadOffset;
@@ -59,7 +53,6 @@ public class AudioReceiver : MonoBehaviour
                 frames.Remove(frameId);
             }
 
-            // cleanup stale
             var timeout = DateTime.UtcNow.AddSeconds(-2);
             var stale = new List<int>();
             foreach (var kv in frames) if (kv.Value.firstReceived < timeout) stale.Add(kv.Key);

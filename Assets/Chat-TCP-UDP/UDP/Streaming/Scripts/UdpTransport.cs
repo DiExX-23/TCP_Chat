@@ -1,4 +1,3 @@
-// UdpTransport.cs
 using System;
 using System.Net;
 using System.Net.Sockets;
@@ -21,18 +20,13 @@ public class UdpTransport : MonoBehaviour
     private IPEndPoint lastRemoteEndPoint = null;               // last endpoint that sent us a packet
 
     // event raised when a packet arrives, provides payload and remote endpoint
-    public Action<byte[], IPEndPoint> OnPacketReceived;        // packet callback
+    public Action<byte[], IPEndPoint> OnPacketReceived;
 
-    // Returns whether transport is running
     public bool IsRunning => started;
 
-    /// <summary>
-    /// StartTransport starts (or restarts) UDP transport; bindLocal true means server mode.
-    /// </summary>
     public void StartTransport(int localPort, string remoteAddress, int remotePort, bool bindLocal)
     {
-        // stop any existing transport first
-        StopTransport();
+        StopTransport(); // ensure cleanup
 
         this.localPort = localPort;
         this.remoteAddress = remoteAddress;
@@ -43,22 +37,20 @@ public class UdpTransport : MonoBehaviour
         {
             if (bindLocal)
             {
-                // bind to local port (server/listen mode)
                 udp = new UdpClient(localPort);
             }
             else
             {
-                // client mode: create socket and optionally connect to configured remote
                 udp = new UdpClient();
                 if (!string.IsNullOrEmpty(remoteAddress))
                 {
-                    try { udp.Connect(remoteAddress, remotePort); } catch { /* ignore connect errors */ }
+                    try { udp.Connect(remoteAddress, remotePort); } catch { }
                 }
             }
 
             cts = new CancellationTokenSource();
             started = true;
-            _ = ReceiveLoopAsync(cts.Token); // start receive loop (fire-and-forget)
+            _ = ReceiveLoopAsync(cts.Token);
             Debug.Log($"[UdpTransport] Started. LocalPort={localPort}, Remote={remoteAddress}:{remotePort}, Bound={bindLocal}");
         }
         catch (Exception ex)
@@ -71,9 +63,6 @@ public class UdpTransport : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// StopTransport cancels receive loop and closes socket.
-    /// </summary>
     public void StopTransport()
     {
         if (!started && udp == null) return;
@@ -96,11 +85,6 @@ public class UdpTransport : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// SendAsync attempts to send non-blocking.
-    /// It will prefer lastRemoteEndPoint, then configured remoteAddress, otherwise skip send.
-    /// </summary>
-    // SendAsync: non-blocking send that respects whether the underlying socket is connected.
     public void SendAsync(byte[] data)
     {
         if (data == null || data.Length == 0) return;
@@ -112,28 +96,24 @@ public class UdpTransport : MonoBehaviour
 
         try
         {
-            // If socket is connected (client mode), use SendAsync without endpoint.
             if (udp.Client != null && udp.Client.Connected)
             {
-                _ = udp.SendAsync(data, data.Length); // send to connected remote
+                _ = udp.SendAsync(data, data.Length);
                 return;
             }
 
-            // If we know the last remote endpoint (server replying to client), use it.
             if (lastRemoteEndPoint != null)
             {
-                _ = udp.SendAsync(data, data.Length, lastRemoteEndPoint.Address.ToString(), lastRemoteEndPoint.Port);
+                _ = udp.SendAsync(data, data.Length, lastRemoteEndPoint);
                 return;
             }
 
-            // If configured remote address is available, send to it (unconnected client case).
             if (!string.IsNullOrEmpty(remoteAddress) && remotePort > 0)
             {
                 _ = udp.SendAsync(data, data.Length, remoteAddress, remotePort);
                 return;
             }
 
-            // No known remote; drop and warn.
             Debug.LogWarning("[UdpTransport] Send attempted but no remote endpoint known; packet dropped.");
         }
         catch (Exception ex)
@@ -142,10 +122,6 @@ public class UdpTransport : MonoBehaviour
         }
     }
 
-
-    /// <summary>
-    /// Async receive loop; updates lastRemoteEndPoint and invokes OnPacketReceived.
-    /// </summary>
     private async Task ReceiveLoopAsync(CancellationToken token)
     {
         try
@@ -157,12 +133,14 @@ public class UdpTransport : MonoBehaviour
                 {
                     res = await udp.ReceiveAsync().ConfigureAwait(false);
                 }
-                catch (ObjectDisposedException)
-                {
-                    break; // socket closed
-                }
+                catch (ObjectDisposedException) { break; }
                 catch (SocketException se)
                 {
+                    if (se.SocketErrorCode == SocketError.ConnectionReset)
+                    {
+                        Debug.LogWarning("[UdpTransport] Receive socket reset (ignored).");
+                        continue;
+                    }
                     Debug.LogWarning($"[UdpTransport] Receive socket exception: {se.SocketErrorCode}");
                     await Task.Delay(10);
                     continue;
@@ -178,9 +156,7 @@ public class UdpTransport : MonoBehaviour
                 {
                     try
                     {
-                        // record last remote endpoint so server can reply
                         lastRemoteEndPoint = res.RemoteEndPoint;
-                        // invoke handlers (they should be thread-safe or enqueue for main thread)
                         OnPacketReceived?.Invoke(res.Buffer, res.RemoteEndPoint);
                     }
                     catch (Exception ex)
@@ -190,10 +166,7 @@ public class UdpTransport : MonoBehaviour
                 }
             }
         }
-        finally
-        {
-            started = false;
-        }
+        finally { started = false; }
     }
 
     private void OnDestroy() => StopTransport();
