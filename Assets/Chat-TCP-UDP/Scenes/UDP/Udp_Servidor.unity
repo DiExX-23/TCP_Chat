@@ -1145,10 +1145,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9f0a4bfdc5c658741bb60556f89ea87d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  serverPort: 5555
-  serverAddress: 127.0.0.1
-  _client: {fileID: 546525534}
-  messageInput: {fileID: 0}
+  ipInputObject: {fileID: 1020273735}
+  portInputObject: {fileID: 1884513174}
+  startButtonObject: {fileID: 1538603189}
+  stopButtonObject: {fileID: 1856244125}
+  streamingManagerObject: {fileID: 1585667709}
 --- !u!1 &963194225
 GameObject:
   m_ObjectHideFlags: 0
@@ -1688,9 +1689,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4b3b1b3b8aa26274a8311282b5cc0230, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  LocalPort: 0
-  RemoteAddress: 127.0.0.1
-  RemotePort: 5555
 --- !u!1 &1077915026
 GameObject:
   m_ObjectHideFlags: 0
@@ -2335,9 +2333,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4b3b1b3b8aa26274a8311282b5cc0230, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  LocalPort: 0
-  RemoteAddress: 127.0.0.1
-  RemotePort: 5555
 --- !u!1 &1360431984
 GameObject:
   m_ObjectHideFlags: 0
@@ -2399,9 +2394,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4b3b1b3b8aa26274a8311282b5cc0230, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  LocalPort: 0
-  RemoteAddress: 127.0.0.1
-  RemotePort: 5555
 --- !u!1 &1384639742
 GameObject:
   m_ObjectHideFlags: 0
@@ -2982,9 +2974,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4b3b1b3b8aa26274a8311282b5cc0230, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  LocalPort: 0
-  RemoteAddress: 127.0.0.1
-  RemotePort: 5555
 --- !u!1 &1772886002
 GameObject:
   m_ObjectHideFlags: 0
@@ -3123,9 +3112,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4b3b1b3b8aa26274a8311282b5cc0230, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  LocalPort: 0
-  RemoteAddress: 127.0.0.1
-  RemotePort: 5555
 --- !u!1 &1856244125
 GameObject:
   m_ObjectHideFlags: 0
@@ -3515,7 +3501,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ba1a6beab7e1314294cbf452a837aa3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  sampleRate: 16000
+  inputSampleRate: 16000
+  inputChannels: 1
+  playedFramesCount: 0
+  outputRms: 0
 --- !u!82 &1912642816
 AudioSource:
   m_ObjectHideFlags: 0

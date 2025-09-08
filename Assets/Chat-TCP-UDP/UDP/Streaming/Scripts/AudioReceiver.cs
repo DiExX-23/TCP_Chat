@@ -1,58 +1,52 @@
-using System.Collections.Generic;
+// AudioReceiver.cs
 using System;
-using UnityEngine;
+using System.Collections.Generic;
 using System.Collections.Concurrent;
+using UnityEngine;
 
+/// <summary>
+/// Receives fragmented PCM frames, reassembles them and enqueues byte[] for AudioPlayer.
+/// </summary>
 [RequireComponent(typeof(UdpTransport))]
 public class AudioReceiver : MonoBehaviour
 {
     public UdpTransport transport;
     public ConcurrentQueue<byte[]> audioQueue = new ConcurrentQueue<byte[]>();
 
-    private class FrameBuffer
-    {
-        public int frameId;
-        public ushort total;
-        public Dictionary<ushort, byte[]> chunks = new Dictionary<ushort, byte[]>();
-        public DateTime firstReceived = DateTime.UtcNow;
-    }
-
+    private class FrameBuffer { public int frameId; public ushort total; public Dictionary<ushort, byte[]> chunks = new Dictionary<ushort, byte[]>(); public DateTime firstReceived = DateTime.UtcNow; }
     private readonly object lockObj = new object();
     private readonly Dictionary<int, FrameBuffer> frames = new Dictionary<int, FrameBuffer>();
 
-    private void Awake()
-    {
-        if (transport == null) transport = GetComponent<UdpTransport>();
-    }
+    private void Awake() { transport = transport ?? GetComponent<UdpTransport>(); }
+    private void OnEnable() { if (transport != null) transport.OnPacketReceived += OnPacket; }
+    private void OnDisable() { if (transport != null) transport.OnPacketReceived -= OnPacket; }
 
-    private void OnEnable() => transport.OnPacketReceived += OnPacket;
-    private void OnDisable() => transport.OnPacketReceived -= OnPacket;
-
+    // Packet handler (can be called on receive thread)
     private void OnPacket(byte[] data, System.Net.IPEndPoint src)
     {
-        if (data.Length <= Packetizer.HeaderSize) return;
+        if (data == null || data.Length <= Packetizer.HeaderSize) return;
 
         Packetizer.ParseHeader(data, out int frameId, out ushort packetIndex, out ushort packetCount, out byte streamType);
-        if (streamType != 2) return;
+        if (streamType != 2) return; // audio only
 
         int payloadOffset = Packetizer.HeaderSize;
-        var payload = new byte[data.Length - payloadOffset];
-        Buffer.BlockCopy(data, payloadOffset, payload, 0, payload.Length);
+        int payloadLen = data.Length - payloadOffset;
+        var payload = new byte[payloadLen];
+        Buffer.BlockCopy(data, payloadOffset, payload, 0, payloadLen);
 
         lock (lockObj)
         {
             if (!frames.TryGetValue(frameId, out FrameBuffer buf))
             {
-                buf = new FrameBuffer { frameId = frameId, total = packetCount };
+                buf = new FrameBuffer { frameId = frameId, total = packetCount, firstReceived = DateTime.UtcNow };
                 frames[frameId] = buf;
             }
-            buf.chunks[packetIndex] = payload;
+            if (!buf.chunks.ContainsKey(packetIndex)) buf.chunks[packetIndex] = payload;
 
             if (buf.chunks.Count == buf.total)
             {
                 int totalLen = 0;
-                foreach (var c in buf.chunks.Values) totalLen += c.Length;
-
+                for (ushort i = 0; i < buf.total; i++) totalLen += buf.chunks[i].Length;
                 var all = new byte[totalLen];
                 int pos = 0;
                 for (ushort i = 0; i < buf.total; i++)
@@ -65,7 +59,7 @@ public class AudioReceiver : MonoBehaviour
                 frames.Remove(frameId);
             }
 
-            // cleanup old frames
+            // cleanup stale
             var timeout = DateTime.UtcNow.AddSeconds(-2);
             var stale = new List<int>();
             foreach (var kv in frames) if (kv.Value.firstReceived < timeout) stale.Add(kv.Key);
